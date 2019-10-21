@@ -32,7 +32,10 @@ func printPasswords() {
 	}
 }
 
-func main() {
-	fmt.Println(Match("~typhlosion~"))
-	//printPasswords()
+func consoleInput() {
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Println("Enter some text: ")
+	for scanner.Scan() {
+		fmt.Println("Password Found On List:", Match(scanner.Text()))
+	}
 }
