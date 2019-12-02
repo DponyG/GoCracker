@@ -1,75 +1,49 @@
 package main
 
-
 import (
 	"bufio"
 	"fmt"
 	"os"
-	"strings"
+	"time"
 )
-
-
 
 var fileName = "./abc.txt"
 var fileName2 = "./realhuman_phill.txt"
 
+//GenerateCombinations generates the combinations and uses channels
+//Source:https://stackoverflow.com/questions/19249588/go-programming-generating-combinations
+//Because my implementations resulted in 16GB of memory going byebye in the blink of an eye
+func GenerateCombinations(alphabet string, length int) <-chan string {
+	c := make(chan string)
 
+	// Starting a separate goroutine that will create all the combinations,
+	// feeding them to the channel c
+	go func(c chan string) {
+		defer close(c) // Once the iteration function is finished, we close the channel
 
-//1112114
+		AddLetter(c, "", alphabet, length) // We start by feeding it an empty string
+	}(c)
 
-
-
-//SOURCE: https://github.com/mxschmitt/golang-combinations/blob/master/combinations.go
-// Package combinations provides a method to generate all combinations out of a given string array.
-
-// All returns all combinations for a given string array.
-// This is essentially a powerset of the given set except that the empty set is disregarded.
-func All(set []string) (subsets [][]string) {
-	length := uint(len(set))
-
-	// Go through all possible combinations of objects
-	// from 1 (only first object in subset) to 2^length (all objects in subset)
-	for subsetBits := 1; subsetBits < (1 << length); subsetBits++ {
-		var subset []string
-
-		for object := uint(0); object < length; object++ {
-			// checks if object is contained in subset
-			// by checking if bit 'object' is set in subsetBits
-			if (subsetBits>>object)&1 == 1 {
-				// add object to subset
-				subset = append(subset, set[object])
-			}
-		}
-		// add subset to subsets
-		subsets = append(subsets, subset)
-	}
-	return subsets
+	return c // Return the channel to the calling function
 }
 
-func brute(pass string) int {
-	//combinations := All([]string{"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","t","u","v","w","x","y","z",
-	//		"A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
-	//		"!","@","#","$","%","^","&","*","(",")","-","=","_","+","`","~","[","]","{","}",";",":",",","<",".",">","/","?",
-	//		"1","2","3","4","5","6","7","8","9","0"})
-	combinations := All([]string{"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","t","u","v","w","x","y","z",
-		"A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
-		"1","2","3","4","5","6","7","8","9","0"})
-
-	fmt.Println(combinations)
-	for _, s := range combinations {
-		justString := strings.Join(s,"")
-		println(justString)
-		if justString == pass {
-			println("Hallelujah! the string is ", justString)
-			break
-		}
-
+// AddLetter adds a letter to the combination to create a new combination.
+// This new combination is passed on to the channel before we call AddLetter once again
+// to add yet another letter to the new combination in case length allows it
+func AddLetter(c chan string, combo string, alphabet string, length int) {
+	// Check if we reached the length limit
+	// If so, we just return without adding anything
+	if length <= 0 {
+		return
 	}
 
-	return 0
-
+	var newCombo string
+	for _, ch := range alphabet {
+		newCombo = combo + string(ch)
+		c <- newCombo
+		AddLetter(c, newCombo, alphabet, length-1)
+	}
 }
-
 
 //Match returns true if the given pass is found in the Big text file
 func Match(pass string, bigMatch bool) bool {
@@ -114,9 +88,21 @@ func consoleInput() {
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Println("Enter some text: ")
 	for scanner.Scan() {
-		//fmt.Println("Password Found On Big List:", Match(scanner.Text(), true))
-		//fmt.Println("Password Found On Special List:", Match(scanner.Text(), false))
-
-		fmt.Println("Password Found On Special List:", brute(scanner.Text()))
+		start := time.Now()
+		fmt.Println("Password Found On Big List:", Match(scanner.Text(), true))
+		fmt.Println("This took: ", time.Since(start))
+		start = time.Now()
+		fmt.Println("Password Found On Special List:", Match(scanner.Text(), false))
+		fmt.Println("This took: ", time.Since(start))
+		start = time.Now()
+		for combination := range GenerateCombinations("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*()1234567890[]{}\\|;':\",./<>?", len(scanner.Text())) {
+			if scanner.Text() == combination {
+				fmt.Println("Password found through brute force: ", scanner.Text())
+				fmt.Println("This took: ", time.Since(start))
+				break
+			}
+		}
+		fmt.Println("+--------------------------------------------------+")
+		fmt.Println("Enter some more passwords for us to crack, please :)")
 	}
 }
